@@ -1,6 +1,6 @@
 [build]
-  command = "pip install -r requirements.txt && python3 -m prisma generate"
-  publish = "/"
+  command = "npm install && npm run build && pip install -r requirements.txt && python3 -m prisma generate"
+  publish = "dist"
 
 [functions]
   directory = "netlify-functions"
