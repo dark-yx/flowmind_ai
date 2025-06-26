@@ -24,8 +24,8 @@ from agents.mindflow import MindFlowAgent
 from agents.taskflow import TaskFlowAgent
 from agents.calendarflow import CalendarFlowAgent
 from agents.infoflow import InfoFlowAgent
-from tools.db_tool import DatabaseTool
-from tools.google_api_tool import GoogleAPITool
+from tools import db_tool
+from tools import google_api_tool
 from tools.llm_router import LLMRouter
 from tools.elevenlabs_tool import ElevenLabsTool
 from tools.tavus_tool import TavusTool
@@ -51,8 +51,8 @@ app.add_middleware(
 security = HTTPBearer()
 
 # Global instances
-db_tool = DatabaseTool()
-google_tool = GoogleAPITool()
+db_tool = db_tool.DatabaseTool()
+google_tool = google_api_tool.GoogleAPITool()
 llm_router = LLMRouter()
 elevenlabs_tool = ElevenLabsTool()
 tavus_tool = TavusTool()
