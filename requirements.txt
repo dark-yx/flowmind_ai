@@ -1,0 +1,32 @@
+# Core LangGraph and AI dependencies
+langgraph==0.0.62
+langchain==0.1.0
+langchain-openai==0.0.5
+langchain-google-genai==0.0.6
+langchain-anthropic==0.0.4
+
+# FastAPI backend
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Database and ORM
+prisma==0.11.0
+psycopg2-binary==2.9.9
+asyncpg==0.29.0
+
+# External API integrations
+google-auth==2.23.4
+google-auth-oauthlib==1.1.0
+google-auth-httplib2==0.2.0
+google-api-python-client==2.108.0
+elevenlabs==0.2.26
+supabase==2.0.2
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.0
+httpx==0.25.2
+aiofiles==23.2.1
