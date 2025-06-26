@@ -18,14 +18,15 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.tools import tool
 
 # Local imports
 from agents.mindflow import MindFlowAgent
 from agents.taskflow import TaskFlowAgent
 from agents.calendarflow import CalendarFlowAgent
 from agents.infoflow import InfoFlowAgent
-from tools import db_tool
-from tools import google_api_tool
+from tools.db_tool import DBTool
+from tools.google_api_tool import GoogleAPITool
 from tools.llm_router import LLMRouter
 from tools.elevenlabs_tool import ElevenLabsTool
 from tools.tavus_tool import TavusTool
@@ -51,8 +52,8 @@ app.add_middleware(
 security = HTTPBearer()
 
 # Global instances
-db_tool = db_tool.DatabaseTool()
-google_tool = google_api_tool.GoogleAPITool()
+db_tool = DBTool()
+google_tool = GoogleAPITool()
 llm_router = LLMRouter()
 elevenlabs_tool = ElevenLabsTool()
 tavus_tool = TavusTool()
@@ -77,6 +78,47 @@ class FlowMindGraph:
         workflow.add_node("taskflow", self._taskflow_node)
         workflow.add_node("calendarflow", self._calendarflow_node)
         workflow.add_node("infoflow", self._infoflow_node)
+
+        # Register Google API tools
+        # These tools will require credentials passed from the state or context
+        @tool
+        async def get_calendar_events_tool(user_id: str, max_results: int = 10):
+            # In a real app, you would retrieve credentials for user_id
+            # For this example, we'll assume credentials are part of a mock or passed securely.
+            # For now, this is a placeholder.
+            # You would fetch credentials based on user_id, e.g., from a database linked to OAuth tokens.
+            # As per instruction, MindFlow handles proactive orchestration, so we pass current_user_credentials from state.
+            # This requires credentials to be stored in FlowMindState.context
+            if "google_credentials" not in FlowMindState.context or not FlowMindState.context["google_credentials"]:
+                raise ValueError("Google credentials not found in state context.")
+            credentials = FlowMindState.context["google_credentials"]
+            return await google_tool.get_calendar_events(credentials, max_results)
+
+        @tool
+        async def create_calendar_event_tool(user_id: str, summary: str, description: Optional[str], start_time: datetime, end_time: datetime):
+            if "google_credentials" not in FlowMindState.context or not FlowMindState.context["google_credentials"]:
+                raise ValueError("Google credentials not found in state context.")
+            credentials = FlowMindState.context["google_credentials"]
+            return await google_tool.create_calendar_event(credentials, summary, description, start_time, end_time)
+        
+        @tool
+        async def get_tasks_tool(user_id: str, tasklist_id: str = "@default", max_results: int = 10):
+            if "google_credentials" not in FlowMindState.context or not FlowMindState.context["google_credentials"]:
+                raise ValueError("Google credentials not found in state context.")
+            credentials = FlowMindState.context["google_credentials"]
+            return await google_tool.get_tasks(credentials, tasklist_id, max_results)
+
+        @tool
+        async def create_task_tool(user_id: str, title: str, tasklist_id: str = "@default"):
+            if "google_credentials" not in FlowMindState.context or not FlowMindState.context["google_credentials"]:
+                raise ValueError("Google credentials not found in state context.")
+            credentials = FlowMindState.context["google_credentials"]
+            return await google_tool.create_task(credentials, title, tasklist_id)
+
+        workflow.add_tool(get_calendar_events_tool)
+        workflow.add_tool(create_calendar_event_tool)
+        workflow.add_tool(get_tasks_tool)
+        workflow.add_tool(create_task_tool)
         
         # Define routing logic
         workflow.set_entry_point("mindflow")
@@ -156,7 +198,7 @@ class FlowMindGraph:
         # Simple logic: end after agent processes
         return "end"
     
-    async def run(self, user_input: str, user_id: str) -> Dict[str, Any]:
+    async def run(self, user_input: str, user_id: str, google_credentials: Optional[Any] = None) -> Dict[str, Any]:
         """Execute the multi-agent workflow"""
         initial_state = FlowMindState(
             messages=[UserMessage(content=user_input, user_id=user_id)],
@@ -164,6 +206,8 @@ class FlowMindGraph:
             current_agent="mindflow",
             context={}
         )
+        if google_credentials:
+            initial_state.context["google_credentials"] = google_credentials
         
         final_state = await self.graph.ainvoke(initial_state)
         
@@ -180,6 +224,7 @@ flowmind_graph = FlowMindGraph()
 class ChatRequest(BaseModel):
     message: str
     user_id: str
+    google_credentials: Optional[Any] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -199,7 +244,7 @@ class VideoReportRequest(BaseModel):
 async def chat_endpoint(request: ChatRequest):
     """Main chat endpoint for multi-agent interaction"""
     try:
-        result = await flowmind_graph.run(request.message, request.user_id)
+        result = await flowmind_graph.run(request.message, request.user_id, request.google_credentials)
         return ChatResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat processing failed: {str(e)}")
@@ -249,58 +294,64 @@ async def video_report_endpoint(request: VideoReportRequest):
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "agents": ["mindflow", "taskflow", "calendarflow", "infoflow"]
-    }
+    return {"status": "ok", "message": "FlowMind AI backend is running!"}
+
+@app.get("/google-auth-url")
+async def google_auth_url():
+    auth_url, state = google_tool.get_google_auth_url()
+    return {"authorization_url": auth_url, "state": state}
+
+@app.get("/google-oauth-callback")
+async def google_oauth_callback(code: str, state: str):
+    try:
+        credentials = google_tool.exchange_code_for_token(f"code={code}&state={state}")
+        # In a real application, you would store these credentials securely,
+        # linked to the user_id, possibly in your database.
+        # For now, we'll return them, but they won't persist across requests
+        # without a proper session or database integration.
+        return {"message": "Authentication successful", "credentials": credentials.to_json()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Authentication failed: {str(e)}")
 
 @app.get("/user/{user_id}/tasks")
 async def get_user_tasks(user_id: str):
-    """Get user's tasks"""
     try:
-        tasks = await db_tool.get_user_tasks(user_id)
+        tasks = await db_tool.list_tasks(user_id)
         return {"tasks": tasks}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch tasks: {str(e)}")
 
 @app.get("/user/{user_id}/events")
 async def get_user_events(user_id: str):
-    """Get user's calendar events"""
     try:
-        events = await google_tool.get_calendar_events(user_id)
+        events = await db_tool.list_events(user_id)
         return {"events": events}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch events: {str(e)}")
 
-# Background task for proactive suggestions
 @app.on_event("startup")
 async def startup_event():
-    """Initialize background tasks"""
-    asyncio.create_task(proactive_suggestion_loop())
+    await db_tool.connect()
+    print("Database connected.")
 
+@app.on_event("shutdown")
+async def shutdown_event():
+    await db_tool.disconnect()
+    print("Database disconnected.")
+
+# Proactive suggestion loop (placeholder for MindFlow's proactivity)
 async def proactive_suggestion_loop():
-    """Background loop for proactive suggestions"""
+    # This loop would run in the background, orchestrated by MindFlow
+    # It would periodically check for user context, deadlines, etc.
+    # and generate proactive suggestions/actions.
     while True:
-        try:
-            # Get all active users
-            users = await db_tool.get_active_users()
-            
-            for user in users:
-                # Run proactive analysis
-                suggestions = await mindflow_agent.generate_proactive_suggestions(user["id"])
-                
-                if suggestions:
-                    # Store suggestions for UI to display
-                    await db_tool.store_suggestions(user["id"], suggestions)
-            
-            # Wait 30 minutes before next scan
-            await asyncio.sleep(1800)
-            
-        except Exception as e:
-            print(f"Proactive suggestion loop error: {e}")
-            await asyncio.sleep(300)  # Wait 5 minutes on error
+        await asyncio.sleep(3600)  # Check every hour
+        # Example: mindflow_agent.check_for_proactive_actions()
+
+# Run the proactive loop in background
+@app.on_event("startup")
+async def start_proactive_loop():
+    asyncio.create_task(proactive_suggestion_loop())
 
 if __name__ == "__main__":
     uvicorn.run(

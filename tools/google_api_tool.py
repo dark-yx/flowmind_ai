@@ -12,18 +12,26 @@ import datetime
 
 class GoogleAPITool:
     def __init__(self):
-        # In a real application, you might load credentials differently
-        pass
+        self.client_config = {
+            "web": {
+                "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+                "project_id": "flowmind-ai", # You might want to get this from an env var too
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+                "redirect_uris": [os.getenv("GOOGLE_REDIRECT_URI")],
+                "javascript_origins": ["http://localhost:3000"] # Add your frontend origin
+            }
+        }
 
     def get_google_auth_url(self):
-        # The client_secret.json should be downloaded from Google Cloud Console
-        # and placed in the root of the project, or handled securely.
         SCOPES = [
             'https://www.googleapis.com/auth/calendar.events',
             'https://www.googleapis.com/auth/tasks'
         ]
-        flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-            'client_secret.json', SCOPES)
+        flow = google_auth_oauthlib.flow.Flow.from_client_config(
+            self.client_config, scopes=SCOPES)
         flow.redirect_uri = os.getenv('GOOGLE_REDIRECT_URI')
 
         authorization_url, state = flow.authorization_url(
@@ -36,8 +44,8 @@ class GoogleAPITool:
             'https://www.googleapis.com/auth/calendar.events',
             'https://www.googleapis.com/auth/tasks'
         ]
-        flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-            'client_secret.json', SCOPES)
+        flow = google_auth_oauthlib.flow.Flow.from_client_config(
+            self.client_config, scopes=SCOPES)
         flow.redirect_uri = os.getenv('GOOGLE_REDIRECT_URI')
         flow.fetch_token(authorization_response=authorization_response)
         return flow.credentials
