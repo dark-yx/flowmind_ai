@@ -1,0 +1,19 @@
+[build]
+  command = "pip install -r requirements.txt && python3 -m prisma generate"
+  publish = "/"
+
+[functions]
+  directory = "netlify-functions"
+  # This is a placeholder for serverless functions if needed.
+  # For a simple FastAPI app, you might not need this if main.py is served directly.
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/main"
+  status = 200 
