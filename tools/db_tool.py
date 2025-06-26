@@ -1,19 +1,19 @@
 from prisma import Prisma
 from prisma.models import Task, Event, Note, LLMConfig
 from datetime import datetime
+from typing import List, Optional, Dict, Any
 
-class DatabaseTool:
+class DBTool:
     def __init__(self):
         self.db = Prisma()
 
-    async def connect_db(self):
+    async def connect(self):
         await self.db.connect()
 
-    async def disconnect_db(self):
+    async def disconnect(self):
         await self.db.disconnect()
 
-    # Task CRUD operations
-    async def create_task(self, title: str, description: str = None, due_date: datetime = None, priority: str = "medium", status: str = "pending", user_id: str = "default") -> Task:
+    async def create_task(self, title: str, user_id: str, description: Optional[str] = None, due_date: Optional[datetime] = None, priority: str = "medium", status: str = "pending") -> Dict[str, Any]:
         task = await self.db.task.create(
             data={
                 "title": title,
@@ -24,76 +24,54 @@ class DatabaseTool:
                 "user_id": user_id,
             }
         )
-        return task
+        return task.dict()
 
-    async def get_task(self, task_id: str) -> Task | None:
+    async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         task = await self.db.task.find_unique(where={"id": task_id})
-        return task
+        return task.dict() if task else None
 
-    async def get_all_tasks(self, user_id: str = "default") -> list[Task]:
-        tasks = await self.db.task.find_many(where={"user_id": user_id})
-        return tasks
+    async def update_task(self, task_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        task = await self.db.task.update(where={"id": task_id}, data=data)
+        return task.dict() if task else None
 
-    async def update_task(self, task_id: str, title: str = None, description: str = None, due_date: datetime = None, priority: str = None, status: str = None) -> Task:
-        data = {}
-        if title: data["title"] = title
-        if description: data["description"] = description
-        if due_date: data["due_date"] = due_date
-        if priority: data["priority"] = priority
-        if status: data["status"] = status
-
-        task = await self.db.task.update(
-            where={"id": task_id},
-            data=data,
-        )
-        return task
-
-    async def delete_task(self, task_id: str) -> Task:
+    async def delete_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         task = await self.db.task.delete(where={"id": task_id})
-        return task
+        return task.dict() if task else None
 
-    # Event CRUD operations
-    async def create_event(self, title: str, description: str = None, start_time: datetime = None, end_time: datetime = None, location: str = None, user_id: str = "default") -> Event:
+    async def list_tasks(self, user_id: str) -> List[Dict[str, Any]]:
+        tasks = await self.db.task.find_many(where={"user_id": user_id})
+        return [task.dict() for task in tasks]
+
+    async def create_event(self, title: str, start_time: datetime, end_time: datetime, user_id: str, description: Optional[str] = None, location: Optional[str] = None) -> Dict[str, Any]:
         event = await self.db.event.create(
             data={
                 "title": title,
-                "description": description,
                 "start_time": start_time,
                 "end_time": end_time,
+                "description": description,
                 "location": location,
                 "user_id": user_id,
             }
         )
-        return event
+        return event.dict()
 
-    async def get_event(self, event_id: str) -> Event | None:
+    async def get_event(self, event_id: str) -> Optional[Dict[str, Any]]:
         event = await self.db.event.find_unique(where={"id": event_id})
-        return event
+        return event.dict() if event else None
 
-    async def get_all_events(self, user_id: str = "default") -> list[Event]:
-        events = await self.db.event.find_many(where={"user_id": user_id})
-        return events
+    async def update_event(self, event_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        event = await self.db.event.update(where={"id": event_id}, data=data)
+        return event.dict() if event else None
 
-    async def update_event(self, event_id: str, title: str = None, description: str = None, start_time: datetime = None, end_time: datetime = None, location: str = None) -> Event:
-        data = {}
-        if title: data["title"] = title
-        if description: data["description"] = description
-        if start_time: data["start_time"] = start_time
-        if end_time: data["end_time"] = end_time
-        if location: data["location"] = location
-
-        event = await self.db.event.update(
-            where={"id": event_id},
-            data=data,
-        )
-        return event
-
-    async def delete_event(self, event_id: str) -> Event:
+    async def delete_event(self, event_id: str) -> Optional[Dict[str, Any]]:
         event = await self.db.event.delete(where={"id": event_id})
-        return event
+        return event.dict() if event else None
 
-    # Note CRUD operations
-    async def create_note(self, title: str, content: str, user_id: str = "default") -> Note:
+    async def list_events(self, user_id: str) -> List[Dict[str, Any]]:
+        events = await self.db.event.find_many(where={"user_id": user_id})
+        return [event.dict() for event in events]
+
+    async def create_note(self, title: str, content: str, user_id: str) -> Dict[str, Any]:
         note = await self.db.note.create(
             data={
                 "title": title,
@@ -101,33 +79,25 @@ class DatabaseTool:
                 "user_id": user_id,
             }
         )
-        return note
+        return note.dict()
 
-    async def get_note(self, note_id: str) -> Note | None:
+    async def get_note(self, note_id: str) -> Optional[Dict[str, Any]]:
         note = await self.db.note.find_unique(where={"id": note_id})
-        return note
+        return note.dict() if note else None
 
-    async def get_all_notes(self, user_id: str = "default") -> list[Note]:
-        notes = await self.db.note.find_many(where={"user_id": user_id})
-        return notes
+    async def update_note(self, note_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        note = await self.db.note.update(where={"id": note_id}, data=data)
+        return note.dict() if note else None
 
-    async def update_note(self, note_id: str, title: str = None, content: str = None) -> Note:
-        data = {}
-        if title: data["title"] = title
-        if content: data["content"] = content
-
-        note = await self.db.note.update(
-            where={"id": note_id},
-            data=data,
-        )
-        return note
-
-    async def delete_note(self, note_id: str) -> Note:
+    async def delete_note(self, note_id: str) -> Optional[Dict[str, Any]]:
         note = await self.db.note.delete(where={"id": note_id})
-        return note
+        return note.dict() if note else None
 
-    # LLMConfig CRUD operations
-    async def create_llm_config(self, model_name: str, api_key: str, temperature: float = 0.7, max_tokens: int = None, user_id: str = "default") -> LLMConfig:
+    async def list_notes(self, user_id: str) -> List[Dict[str, Any]]:
+        notes = await self.db.note.find_many(where={"user_id": user_id})
+        return [note.dict() for note in notes]
+
+    async def create_llm_config(self, model_name: str, api_key: str, user_id: str, temperature: float = 0.7, max_tokens: Optional[int] = None) -> Dict[str, Any]:
         llm_config = await self.db.llmconfig.create(
             data={
                 "model_name": model_name,
@@ -137,29 +107,20 @@ class DatabaseTool:
                 "user_id": user_id,
             }
         )
-        return llm_config
+        return llm_config.dict()
 
-    async def get_llm_config(self, llm_config_id: str) -> LLMConfig | None:
+    async def get_llm_config(self, llm_config_id: str) -> Optional[Dict[str, Any]]:
         llm_config = await self.db.llmconfig.find_unique(where={"id": llm_config_id})
-        return llm_config
+        return llm_config.dict() if llm_config else None
 
-    async def get_all_llm_configs(self, user_id: str = "default") -> list[LLMConfig]:
-        llm_configs = await self.db.llmconfig.find_many(where={"user_id": user_id})
-        return llm_configs
+    async def update_llm_config(self, llm_config_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        llm_config = await self.db.llmconfig.update(where={"id": llm_config_id}, data=data)
+        return llm_config.dict() if llm_config else None
 
-    async def update_llm_config(self, llm_config_id: str, model_name: str = None, api_key: str = None, temperature: float = None, max_tokens: int = None) -> LLMConfig:
-        data = {}
-        if model_name: data["model_name"] = model_name
-        if api_key: data["api_key"] = api_key
-        if temperature: data["temperature"] = temperature
-        if max_tokens: data["max_tokens"] = max_tokens
-
-        llm_config = await self.db.llmconfig.update(
-            where={"id": llm_config_id},
-            data=data,
-        )
-        return llm_config
-
-    async def delete_llm_config(self, llm_config_id: str) -> LLMConfig:
+    async def delete_llm_config(self, llm_config_id: str) -> Optional[Dict[str, Any]]:
         llm_config = await self.db.llmconfig.delete(where={"id": llm_config_id})
-        return llm_config 
+        return llm_config.dict() if llm_config else None
+
+    async def list_llm_configs(self, user_id: str) -> List[Dict[str, Any]]:
+        llm_configs = await self.db.llmconfig.find_many(where={"user_id": user_id})
+        return [llm_config.dict() for llm_config in llm_configs] 
